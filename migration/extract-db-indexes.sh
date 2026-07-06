@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DB="sample_geospatial" # change to your database name
-URI="mongodb+srv://cluster-admin:121529Ji@atlas-clu-jesus.qmzknkx.mongodb.net"
+URI="mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority" # change to your MongoDB URI
 
 mkdir -p indexes
 

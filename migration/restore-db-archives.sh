@@ -9,7 +9,6 @@ set -u -o pipefail
 #
 # Usage:
 #   export TARGET_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
-TARGET_URI='mongodb://admin:DB23ee%23%23%2312345@G5E60EBADF0D95A-AJD.adb.eu-frankfurt-1.oraclecloudapps.com:27017/admin?authMechanism=PLAIN&authSource=$external&ssl=true&retryWrites=false&loadBalanced=true'
 #   ./restore-db-archives.sh /path/to/backups
 #
 # Optional:
