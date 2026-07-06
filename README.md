@@ -4,10 +4,48 @@ This repository contains examples of how to use Oracle JSON and the Oracle Datab
 
 The main flow is:
 
-1. Load JSON collections into Oracle.
-2. Use Oracle JSON features directly with SQL.
-3. Use or develop MongoDB aggregation pipelines through the Oracle Database API for MongoDB.
-4. Add text search and semantic search capabilities over the same document data.
+1. Migrate MongoDB application databases into Oracle Autonomous AI JSON Database.
+2. Load JSON collections into Oracle.
+3. Use Oracle JSON features directly with SQL.
+4. Use or develop MongoDB aggregation pipelines through the Oracle Database API for MongoDB.
+5. Add text search and semantic search capabilities over the same document data.
+
+## Prerequisites
+
+- Oracle AI Autonomous Database or Oracle Database 26ai, on-premises or cloud.
+- Oracle REST Data Services. See [Oracle REST Data Services and Database Actions downloads](https://www.oracle.com/database/sqldeveloper/technologies/db-actions/download/).
+- MongoDB client tools and drivers supported by Oracle Database API for MongoDB. See [Client Tools and Drivers](https://docs.oracle.com/en/database/oracle/mongodb-api/mgapi/support-mongodb-apis-operations-and-data-types-reference.html#GUID-0D110BE7-7BB3-4DC3-9A98-4F517271F2AE) in the Oracle documentation.
+
+## Migration
+
+Directory: `migration/`
+
+These scripts help move MongoDB application databases into Oracle Autonomous AI JSON Database through backup, restore, and index metadata capture.
+
+Key files:
+
+- `backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
+
+```bash
+export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+export APP_DATABASES='appdb1 appdb2'
+./migration/backup-app-dbs.sh
+
+export BACKUP_MODE='all'
+./migration/backup-app-dbs.sh
+```
+
+- `restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file.
+
+```bash
+./migration/restore-db-archives.sh ./backups/20260706_120000
+```
+
+- `extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Update the script's `DB` and `URI` values before running it.
+
+```bash
+./migration/extract-db-indexes.sh
+```
 
 ## Topics
 
