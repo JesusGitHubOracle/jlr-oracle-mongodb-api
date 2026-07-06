@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-
-DB="sample_geospatial" # change to your database name
-URI="mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority" # change to your MongoDB URI
+#usage: ./extract-db-indexes.sh <database_name> <mongodb_uri>
+# DB="${1:-sample_geospatial}" # change to your database name
+# URI="${2:-mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority}" # change to your MongoDB URI
 
 mkdir -p indexes
 
