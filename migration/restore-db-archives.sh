@@ -12,8 +12,8 @@ set -u -o pipefail
 #   ./restore-db-archives.sh /path/to/backups
 #
 # Optional:
-DROP_EXISTING=1    # drop collections before restoring each archive
-SKIP_INDEXES=1     # skip index restore if index creation is failing
+#   export DROP_EXISTING=1    # drop collections before restoring each archive
+#   export SKIP_INDEXES=1     # skip index restore if index creation is failing
 #   export SKIP_SYSTEM_DBS=1  # skip admin/local/config archives by filename
 #   export LOG_DIR=./restore-logs
 
@@ -45,7 +45,7 @@ SUMMARY_FILE="${LOG_DIR}/restore_${RUN_ID}_summary.md"
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 shopt -s nullglob
-archives=( "${BACKUP_DIR}"/*.archive.gz "${BACKUP_DIR}"/*.gz )
+archives=( "${BACKUP_DIR}"/*.archive.gz )
 
 if [[ ${#archives[@]} -eq 0 ]]; then
   echo "No archive files found in: ${BACKUP_DIR}"

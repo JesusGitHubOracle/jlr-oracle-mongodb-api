@@ -35,16 +35,70 @@ export BACKUP_MODE='all'
 ./migration/backup-app-dbs.sh
 ```
 
-- `restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file.
+- `restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file. Set `TARGET_URI` to the target Oracle Database API for MongoDB connection string before running it.
 
 ```bash
-./migration/restore-db-archives.sh ./backups/20260706_120000
+cd migration
+
+export TARGET_URI='mongodb://USER:PASSWORD@HOST:PORT/?authMechanism=PLAIN&authSource=$external&ssl=true'
+./restore-db-archives.sh ./backups/20260706_120000
 ```
 
-- `extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Update the script's `DB` and `URI` values before running it.
+Common restore options:
 
 ```bash
-./migration/extract-db-indexes.sh
+# Drop existing MongoDB collections before restoring.
+export DROP_EXISTING=1
+
+# Skip index restoration if index creation fails or will be handled separately.
+export SKIP_INDEXES=1
+
+# Write logs somewhere other than ./restore-logs.
+export LOG_DIR=./restore-logs
+
+./restore-db-archives.sh ./backups/20260706_120000
+```
+
+The restore script only processes files ending in `.archive.gz`. For example, a backup directory like this:
+
+```text
+backups/20260706_120000/
+  json_aggregations.archive.gz
+  json_orders.archive.gz
+```
+
+restores the databases `json_aggregations` and `json_orders`.
+
+If Oracle reports that a collection already exists even when using `DROP_EXISTING=1`, remove the conflicting Oracle-side object and rerun the restore. Quoted identifiers are needed when the Oracle object name preserves lowercase or mixed-case spelling:
+
+```sql
+drop table "JSON_ORDERS"."purchaseorders" cascade constraints;
+```
+
+- `extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Pass the database name and MongoDB URI as arguments. Views are detected and skipped because MongoDB views do not have collection indexes.
+
+```bash
+cd migration
+
+./extract-db-indexes.sh sample_analytics 'mongodb+srv://USER:PASSWORD@cluster.example.mongodb.net/'
+```
+
+Example output:
+
+```text
+Exporting indexes for transactions
+Exporting indexes for accounts
+Exporting indexes for customers
+Skipping view enriched_transactions
+```
+
+The generated files are written to `migration/indexes/` when the script is run from the `migration/` directory:
+
+```text
+indexes/
+  transactions_indexes.json
+  accounts_indexes.json
+  customers_indexes.json
 ```
 
 ## Topics
