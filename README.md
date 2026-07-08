@@ -2,14 +2,6 @@
 
 This repository contains examples of how to use Oracle JSON and the Oracle Database API for MongoDB to keep document-oriented application patterns while running on Oracle Database.
 
-The main flow is:
-
-1. Migrate MongoDB application databases into Oracle Autonomous AI JSON Database.
-2. Load JSON collections into Oracle.
-3. Use Oracle JSON features directly with SQL.
-4. Use or develop MongoDB aggregation pipelines through the Oracle Database API for MongoDB.
-5. Add text search and semantic search capabilities over the same document data.
-
 ## Prerequisites
 
 - Oracle AI Autonomous Database or Oracle Database 26ai, on-premises or cloud.
@@ -22,9 +14,7 @@ Directory: `migration/`
 
 These scripts help move MongoDB application databases into Oracle Autonomous AI JSON Database through backup, restore, and index metadata capture.
 
-Key files:
-
-- `backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
+`backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
 
 ```bash
 export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
@@ -35,11 +25,10 @@ export BACKUP_MODE='all'
 ./migration/backup-app-dbs.sh
 ```
 
-- `restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file. Set `TARGET_URI` to the target Oracle Database API for MongoDB connection string before running it.
+`restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file. Set `TARGET_URI` to the target Oracle Database API for MongoDB connection string before running it.
 
 ```bash
-cd migration
-
+ 
 export TARGET_URI='mongodb://USER:PASSWORD@HOST:PORT/?authMechanism=PLAIN&authSource=$external&ssl=true'
 ./restore-db-archives.sh ./backups/20260706_120000
 ```
@@ -75,7 +64,7 @@ If Oracle reports that a collection already exists even when using `DROP_EXISTIN
 drop table "JSON_ORDERS"."purchaseorders" cascade constraints;
 ```
 
-- `extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Pass the database name and MongoDB URI as arguments. Views are detected and skipped because MongoDB views do not have collection indexes.
+`extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Pass the database name and MongoDB URI as arguments. Views are detected and skipped because MongoDB views do not have collection indexes.
 
 ```bash
 cd migration
@@ -101,9 +90,7 @@ indexes/
   customers_indexes.json
 ```
 
-## Topics
-
-### 1. Aggregation Pipelines
+## Aggregation Pipelines
 
 Directory: `aggregations/`
 
@@ -119,32 +106,46 @@ Key files:
 - `05-lookup-plants-sql.mongodb.js` shows the SQL-oriented equivalent.
 - `06-lookup-offers-sql.mongodb.js` creates `offerSummary` and `ifaOfferDaily100`, matches offer events by offer, widget, country, and date range, then returns rolled-up metrics in a `replacement` array.
 
-### 2. Text Search
+## Transactions
+
+Directory: `transactions/`
+
+These examples show how to run MongoDB-style transactions with the Oracle Database API for MongoDB, using a bank transfer scenario with an approval step before commit.
+
+ `bank-transfer.mongodb.js` runs the transfer with MongoDB API reads and updates inside a transaction.
+ `bank-transfer-sqljson.mongodb.js` runs the transfer with SQL/JSON reads and updates through `$sql` inside a MongoDB API transaction.
+
+## Change Streams
+
+Directory: `changeStreams/`
+
+These examples show how to enable `$changeStreams` in preview mode and consume insert, update, and delete events from the MongoDB API.
+
+- `watch-orders.mongodb.js` enables change streams on `xs_orders` and watches for changes.
+- `insert-orders.mongodb.js` inserts and updates a sample order so the watcher can receive events.
+
+## Text Search
 
 Directory: `search/`
 
-These examples show how to use MongoDB-style `$search` over JSON movie documents stored in Oracle.
-
-Key files:
+These examples show how to use MongoDB-style `$search` over JSON movie documents stored in Oracle using the MongoDB API.
 
 - `01-create-text-user.sql` creates the text search demo user and grants the required privileges.
 - `02-text-search-orclapi.mongodb.js` demonstrates text search patterns such as single-term search, multi-term search, `matchCriteria`, and fuzzy matching.
-- Sample collection: [mflix_movies.json](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/E_Hz1fFFFfbbIGstyg3beN0_WP6QQwwzATe_BsPXhCiGUeaSoH0WjLU7tBZnzglZ/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/search/mflix_movies.json)
+ Sample collection: [mflix_movies.json](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/E_Hz1fFFFfbbIGstyg3beN0_WP6QQwwzATe_BsPXhCiGUeaSoH0WjLU7tBZnzglZ/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/search/mflix_movies.json)
 
-### 3. Semantic Search
+## Vector Search
 
 Directory: `vectorsearch/`
 
 These examples show semantic search over JSON documents by using vector embeddings together with Oracle JSON collections and the MongoDB API.
-
-Key files:
 
 - `01-load_all_minilm_model_from_par.sql` loads the MiniLM embedding model.
 - `02-create-vector-embeddings.sql` creates embeddings for movie plot data.
 - `03-embed-prompt.sql` embeds a natural-language prompt.
 - `04-vector-search.mongodb.js` demonstrates vector search through the MongoDB API.
 - Vectorized collection: [mflix_movies_embeddings.json](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/yZJUDkTpVHdAI4vTUcuofDHWkk8w5sr2DoawtQ4PL9gQ-7hnHuNLH0gvOQNjJIRo/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/search/mflix_movies_embeddings.json)
-- Embedding model: [ALL_MINILM_L12_V2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/hWtxHRNpBnQKaxtj5KtGVyQu4VYHqtuqAY4PUReK_6NxCeZRl94vm07lMGZAuOih/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/vector-data/all_MiniLM_L12_v2.onnx)
+ Embedding model: [ALL_MINILM_L12_V2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/hWtxHRNpBnQKaxtj5KtGVyQu4VYHqtuqAY4PUReK_6NxCeZRl94vm07lMGZAuOih/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/vector-data/all_MiniLM_L12_v2.onnx)
 
 ## References
 
