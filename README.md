@@ -3,10 +3,6 @@
 
 This repository contains examples of how to use Oracle JSON and the Oracle Database API for MongoDB to keep document-oriented application patterns while running on Oracle Database.
 
-## Prerequisites# Build Document Oriented Applications using Oracle Autonomous AI JSON Database
-
-This repository contains examples of how to use Oracle JSON and the Oracle Database API for MongoDB to keep document-oriented application patterns while running on Oracle Database.
-
 ## Prerequisites
 
 - Oracle AI Autonomous Database or Oracle Database 26ai, on-premises or cloud.
