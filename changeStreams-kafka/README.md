@@ -175,9 +175,4 @@ http://localhost:3000
 
 The UI displays:
 
-- Oracle API for MongoDB connection status
-- Kafka connection status
-- Change Stream status
-- Runtime configuration
-- Live Oracle Dataabse change events
-- Kafka publish events
+ ![Change Streams Kafka demo](./changeStreams-kafka/docs/images/demo-change-streams.jpg)
