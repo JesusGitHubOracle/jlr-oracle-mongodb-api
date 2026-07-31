@@ -175,4 +175,4 @@ http://localhost:3000
 
 The UI displays:
 
- ![Change Streams Kafka demo](./changeStreams-kafka/docs/images/demo-change-streams.jpg)
+ ![Change Streams Kafka demo](changeStreams-kafka/docs/images/demo-change-streams.png)
