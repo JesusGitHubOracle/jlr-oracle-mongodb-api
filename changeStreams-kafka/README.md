@@ -68,6 +68,31 @@ KAFKA_BROKERS=localhost:9092
 KAFKA_TOPIC=mongo.orders.cdc
 ```
 
+
+## Create Oracle User
+
+Connect to the database as **ADMIN** and execute the following script to create the demo schema and enable Oracle REST Data Services (ORDS):
+
+```sql
+DROP USER IF EXISTS shop CASCADE;
+
+CREATE USER shop IDENTIFIED BY "DB23ee###12345";
+
+ALTER USER shop QUOTA UNLIMITED ON DATA;
+
+GRANT CONNECT, RESOURCE, SODA_APP, DB_DEVELOPER_ROLE TO shop;
+GRANT CREATE NOTIFICATION DIRECTIVE TO shop;
+
+BEGIN
+  ords_admin.enable_schema(
+    p_enabled => TRUE,
+    p_schema  => 'SHOP'
+  );
+  COMMIT;
+END;
+/
+```
+
 ## Set up Kafka
 
 Download Kafka:
