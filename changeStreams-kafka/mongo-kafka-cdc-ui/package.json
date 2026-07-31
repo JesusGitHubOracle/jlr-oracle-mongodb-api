@@ -1,0 +1,21 @@
+{
+  "name": "mongo-kafka-cdc-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Small demo app showing MongoDB change streams published to Kafka.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "kafkajs": "^2.2.4",
+    "mongodb": "^6.12.0",
+    "socket.io": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
