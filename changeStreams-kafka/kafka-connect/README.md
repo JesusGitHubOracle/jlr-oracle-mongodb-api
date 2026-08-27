@@ -3,12 +3,14 @@
 This runbook shows how to stream Oracle Database API for MongoDB `$changeStreams` events into Kafka using Kafka Connect and the MongoDB Kafka Source Connector.
 
 ```text
-Oracle Database API for MongoDB
-  -> $changeStreams on shop.orders
-  -> MongoDB Kafka Source Connector
-  -> Kafka topic: mongo.orders.cdc
+Oracle Autonomous AI JSON
+  -> Oracle API for MongoDB $changeStream
+  -> Kafka Connect / MongoDB Source Connector
+  -> Apache Kafka Topic / mongo.orders.cdc
   -> Kafka consumer
 ```
+
+![Kafka Connect Change Streams Architecture](../docs/images/kafka-connect-architecture.svg)
 
 ## Demo Files
 
