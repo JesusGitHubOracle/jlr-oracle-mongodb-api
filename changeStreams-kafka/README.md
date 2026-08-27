@@ -2,6 +2,8 @@
 
 How to stream Oracle Database API for MongoDB `$changeStreams` events into Kafka using Kafka Connect and the MongoDB Kafka Source Connector.
 
+## Architecture
+
 ```text
 Oracle Autonomous AI JSON
   -> Oracle API for MongoDB $changeStream
