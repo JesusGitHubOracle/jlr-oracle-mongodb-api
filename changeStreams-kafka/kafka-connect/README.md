@@ -46,7 +46,7 @@ GRANT CREATE NOTIFICATION DIRECTIVE TO shop;
 This demo uses a patched local copy of the MongoDB Kafka Connector. Generate it locally with:
 
 ```bash
-cd /Users/jlrobles/Documents/GitHub/jlr-oracle-mongodb-api/changeStreams-kafka
+cd <Working directory>/changeStreams-kafka
 kafka-connect/patch-connector.sh
 ```
 
@@ -74,7 +74,7 @@ See `PATCH-NOTES.md` for details.
 Open terminal `T1` and go to the demo directory:
 
 ```bash
-cd <Working diectory>/changeStreams-kafka
+cd <Working directory>/changeStreams-kafka
 cd kafka_2.13-4.3.1
 ```
 
@@ -92,7 +92,7 @@ bin/kafka-storage.sh format \
 Start Kafka if not already done:
 
 ```bash
-cd <Working diectory>/changeStreams-kafka
+cd <Working directory>/changeStreams-kafka
 bin/kafka-server-start.sh -daemon config/server.properties
 ```
 
