@@ -1,0 +1,25 @@
+.DS_Store
+._*
+.env
+
+node_modules/
+
+# Local Kafka runtime, logs, and data
+kafka_2.13-*/
+*.tar
+*.tgz
+*.log
+logs/
+kafka-data/
+*/logs/
+
+# Kafka Connect third-party binaries generated locally
+changeStreams-kafka/kafka-connect/plugins/*.jar
+changeStreams-kafka/kafka-connect/plugins/*.orig
+
+# Demo runtime output
+migration/backups/
+migration/indexes/
+migration/restore-logs/
+vectorsearch/vector-search-ui/
+vectorsearch/vector-search-ui.tar
