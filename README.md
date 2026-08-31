@@ -14,6 +14,23 @@ Directory: `migration/`
 
 These scripts help move MongoDB application databases into Oracle Autonomous AI JSON Database through backup, restore, and index metadata capture.
 
+### MongoDB Database Space Report
+
+Use `atlas_database_space.sh` to report the allocated collection storage, index
+storage, and total occupied storage for every application database in an Atlas
+cluster. It excludes `admin`, `config`, `local`, and Atlas internal databases by default.
+
+```bash
+export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+./migration/atlas_database_space.sh
+```
+
+The connected user needs permission to list databases and run `dbStats` on each
+reported database. Add `--include-system-databases` only when those databases
+also need to be included.
+
+### Backup databases
+
 `backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
 
 ```bash
@@ -24,6 +41,8 @@ export APP_DATABASES='appdb1 appdb2'
 export BACKUP_MODE='all'
 ./migration/backup-app-dbs.sh
 ```
+
+### Restore databases
 
 `restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file. Set `TARGET_URI` to the target Oracle Database API for MongoDB connection string before running it.
 
@@ -63,6 +82,8 @@ If Oracle reports that a collection already exists even when using `DROP_EXISTIN
 ```sql
 drop table "JSON_ORDERS"."purchaseorders" cascade constraints;
 ```
+
+### Extract indexes
 
 `extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Pass the database name and MongoDB URI as arguments. Views are detected and skipped because MongoDB views do not have collection indexes.
 
@@ -123,6 +144,15 @@ These examples show how to enable `$changeStreams` in preview mode and consume i
 
 - `watch-orders.mongodb.js` enables change streams on `xs_orders` and watches for changes.
 - `insert-orders.mongodb.js` inserts and updates a sample order so the watcher can receive events.
+
+## Change Streams Kafka
+
+Directory: `changeStreams-kafka/`
+
+These examples show how to capture Oracle API for MongoDB change stream events with Node.js and publish them to an Apache Kafka topic for downstream processing.
+
+- `mongo-kafka-cdc-cl/` contains the command-line CDC producer, including `cdc-mongodb-to-kafka.js`, which reads change events and publishes them to Kafka.
+- `mongo-kafka-cdc-ui/` contains the browser-based CDC application with connection status, runtime configuration, and a live event timeline for Oracle Database changes and Kafka publishes.
 
 ## Text Search
 
