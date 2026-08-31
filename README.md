@@ -1,196 +1,235 @@
-# Build Document Oriented Applications using Oracle Autonomous AI JSON Database
+# MongoDB Migration Toolkit
 
-This repository contains examples of how to use Oracle JSON and the Oracle Database API for MongoDB to keep document-oriented application patterns while running on Oracle Database.
+This directory contains helper scripts and working folders for moving MongoDB application databases into Oracle Autonomous AI JSON Database or Oracle Database API for MongoDB.
 
-## Prerequisites
+The workflow is:
 
-- Oracle AI Autonomous Database or Oracle Database 26ai, on-premises or cloud.
-- Oracle REST Data Services. See [Oracle REST Data Services and Database Actions downloads](https://www.oracle.com/database/sqldeveloper/technologies/db-actions/download/).
-- MongoDB client tools and drivers supported by Oracle Database API for MongoDB. See [Client Tools and Drivers](https://docs.oracle.com/en/database/oracle/mongodb-api/mgapi/support-mongodb-apis-operations-and-data-types-reference.html#GUID-0D110BE7-7BB3-4DC3-9A98-4F517271F2AE) in the Oracle documentation.
+1. Back up selected MongoDB application databases with `mongodump`.
+2. Optionally extract MongoDB index definitions for review or later recreation.
+3. Restore the generated archive files into the target MongoDB-compatible endpoint.
+4. Review restore logs and summary files.
 
-## Migration
-
-Directory: `migration/`
-
-These scripts help move MongoDB application databases into Oracle Autonomous AI JSON Database through backup, restore, and index metadata capture.
-
-### MongoDB Database Space Report
-
-Use `atlas_database_space.sh` to report the allocated collection storage, index
-storage, and total occupied storage for every application database in an Atlas
-cluster. It excludes `admin`, `config`, `local`, and Atlas internal databases by default.
-
-```bash
-export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
-./migration/atlas_database_space.sh
-```
-
-The connected user needs permission to list databases and run `dbStats` on each
-reported database. Add `--include-system-databases` only when those databases
-also need to be included.
-
-### Backup databases
-
-`backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
-
-```bash
-export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
-export APP_DATABASES='appdb1 appdb2'
-./migration/backup-app-dbs.sh
-
-export BACKUP_MODE='all'
-./migration/backup-app-dbs.sh
-```
-
-### Restore databases
-
-`restore-db-archives.sh` restores every `*.archive.gz` file from a backup directory with `mongorestore`, writes restore logs, and produces a summary file. Set `TARGET_URI` to the target Oracle Database API for MongoDB connection string before running it.
-
-```bash
- 
-export TARGET_URI='mongodb://USER:PASSWORD@HOST:PORT/?authMechanism=PLAIN&authSource=$external&ssl=true'
-./restore-db-archives.sh ./backups/20260706_120000
-```
-
-Common restore options:
-
-```bash
-# Drop existing MongoDB collections before restoring.
-export DROP_EXISTING=1
-
-# Skip index restoration if index creation fails or will be handled separately.
-export SKIP_INDEXES=1
-
-# Write logs somewhere other than ./restore-logs.
-export LOG_DIR=./restore-logs
-
-./restore-db-archives.sh ./backups/20260706_120000
-```
-
-The restore script only processes files ending in `.archive.gz`. For example, a backup directory like this:
+## Directory Layout
 
 ```text
-backups/20260706_120000/
+migration/
+  backup-app-dbs.sh          Back up MongoDB databases into compressed archive files.
+  restore-db-archives.sh     Restore compressed archive files into a target endpoint.
+  extract-db-indexes.sh      Export MongoDB collection index definitions as JSON.
+  backups/                   Timestamped backup runs created by backup-app-dbs.sh.
+  indexes/                   Index JSON files created by extract-db-indexes.sh.
+  restore-logs/              Restore logs and Markdown restore summaries.
+```
+
+Example backup output:
+
+```text
+backups/20260707_103121/
   json_aggregations.archive.gz
   json_orders.archive.gz
 ```
 
-restores the databases `json_aggregations` and `json_orders`.
+Example restore summary:
 
-If Oracle reports that a collection already exists even when using `DROP_EXISTING=1`, remove the conflicting Oracle-side object and rerun the restore. Quoted identifiers are needed when the Oracle object name preserves lowercase or mixed-case spelling:
+```text
+restore-logs/
+  restore_20260707_105740.log
+  restore_20260707_105740_summary.md
+```
+
+## Prerequisites
+
+- MongoDB Database Tools, including `mongodump` and `mongorestore`.
+- MongoDB Shell, `mongosh`.
+- A source MongoDB connection URI.
+- A target Oracle Database API for MongoDB connection URI.
+- Network access from the machine running the scripts to both source and target endpoints.
+
+Keep credentials out of the scripts. Pass connection strings through environment variables or a secure shell/session mechanism.
+
+## 1. Back Up Application Databases
+
+Use `backup-app-dbs.sh` to create one compressed archive per database.
+
+Run from the `migration/` directory:
+
+```bash
+cd migration
+
+export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+export APP_DATABASES='json_orders json_aggregations'
+
+./backup-app-dbs.sh
+```
+
+The script creates a timestamped folder under `backups/`:
+
+```text
+backups/YYYYMMDD_HHMMSS/<database>.archive.gz
+```
+
+To back up all non-system databases, set `BACKUP_MODE=all`:
+
+```bash
+export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+export BACKUP_MODE='all'
+
+./backup-app-dbs.sh
+```
+
+By default, all-mode excludes:
+
+```text
+admin local config
+```
+
+You can override the output location:
+
+```bash
+export BACKUP_DIR='./backups'
+```
+
+## 2. Extract Index Definitions
+
+Use `extract-db-indexes.sh` to save each collection's MongoDB index definitions as JSON files.
+
+```bash
+cd migration
+
+./extract-db-indexes.sh json_orders 'mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+```
+
+The script:
+
+- Lists collections in the requested database.
+- Skips MongoDB views because views do not have collection indexes.
+- Writes index definitions under `indexes/`.
+
+Example output files:
+
+```text
+indexes/
+  accounts_indexes.json
+  customers_indexes.json
+  transactions_indexes.json
+```
+
+These files are useful for migration review, compatibility checks, and deciding whether indexes should be restored automatically or recreated manually after the data load.
+
+## 3. Restore Database Archives
+
+Use `restore-db-archives.sh` to restore every `*.archive.gz` file from a backup directory.
+
+```bash
+cd migration
+
+export TARGET_URI='mongodb://USER:PASSWORD@HOST:PORT/?authMechanism=PLAIN&authSource=$external&ssl=true'
+
+./restore-db-archives.sh ./backups/20260707_103121
+```
+
+For each archive, the script:
+
+- Derives the database name from the file name.
+- Restores only that database namespace with `--nsInclude="<database>.*"`.
+- Continues to the next archive if one restore fails.
+- Counts restored documents after each database restore.
+- Writes a detailed log and Markdown summary.
+
+By default, `admin`, `local`, and `config` archive files are skipped if present.
+
+## Restore Options
+
+Drop existing target collections before restoring:
+
+```bash
+export DROP_EXISTING=1
+```
+
+Skip index restore:
+
+```bash
+export SKIP_INDEXES=1
+```
+
+This is useful when index creation fails during restore, when indexes are not supported in the same form on the target, or when you want to recreate indexes separately after the data load.
+
+Write logs to a custom directory:
+
+```bash
+export LOG_DIR='./restore-logs'
+```
+
+Restore system database archives if needed:
+
+```bash
+export SKIP_SYSTEM_DBS=0
+```
+
+Then run:
+
+```bash
+./restore-db-archives.sh ./backups/20260707_103121
+```
+
+## Restore Logs and Summary
+
+Each restore run creates:
+
+```text
+restore-logs/restore_YYYYMMDD_HHMMSS.log
+restore-logs/restore_YYYYMMDD_HHMMSS_summary.md
+```
+
+The summary contains one row per database:
+
+```markdown
+| Database | Documents | Restore errors | Status |
+|---|---:|---|---|
+| json_aggregations | 84 | No | OK |
+| json_orders | 2008206 | No | OK |
+```
+
+Use the log file for detailed `mongorestore` output and the summary file for a quick run result.
+
+## Recommended Migration Runbook
+
+1. Confirm source and target connectivity with `mongosh`.
+2. Back up explicit application databases first with `APP_DATABASES`.
+3. Extract index definitions for each source database.
+4. Restore to a clean target environment.
+5. Review the restore summary and detailed logs.
+6. Validate document counts and application queries.
+7. Decide whether to keep restored indexes or recreate selected indexes manually.
+8. Repeat with `DROP_EXISTING=1` only when replacing target collections is intentional.
+
+## Troubleshooting
+
+If a restore fails because a target collection already exists, rerun with:
+
+```bash
+export DROP_EXISTING=1
+```
+
+If the target still reports an existing object, check whether a conflicting Oracle-side object exists. Quoted identifiers may be required when object names preserve lowercase or mixed-case spelling:
 
 ```sql
 drop table "JSON_ORDERS"."purchaseorders" cascade constraints;
 ```
 
-### Extract indexes
-
-`extract-db-indexes.sh` exports collection index definitions from a MongoDB database into JSON files under `indexes/`. Pass the database name and MongoDB URI as arguments. Views are detected and skipped because MongoDB views do not have collection indexes.
+If index creation fails during restore, retry the data load without indexes:
 
 ```bash
-cd migration
-
-./extract-db-indexes.sh sample_analytics 'mongodb+srv://USER:PASSWORD@cluster.example.mongodb.net/'
+export SKIP_INDEXES=1
+./restore-db-archives.sh ./backups/20260707_103121
 ```
 
-Example output:
+Then use the files in `indexes/` to review and recreate the indexes that are appropriate for the target platform.
 
-```text
-Exporting indexes for transactions
-Exporting indexes for accounts
-Exporting indexes for customers
-Skipping view enriched_transactions
-```
+## Notes
 
-The generated files are written to `migration/indexes/` when the script is run from the `migration/` directory:
-
-```text
-indexes/
-  transactions_indexes.json
-  accounts_indexes.json
-  customers_indexes.json
-```
-
-## Aggregation Pipelines
-
-Directory: `aggregations/`
-
-These examples show how to create JSON collection tables, load document data, and compare Oracle SQL/JSON approaches with MongoDB API aggregation pipelines.
-
-Key files:
-
-- `00-create-agg-user.sql` creates the aggregation demo user.
-- `01-enrich-orders-oracle-json.sql` loads order, product, and warehouse JSON collections and builds an enriched order document with Oracle SQL/JSON.
-- `02-enrich-orders-mongoapi.mongodb.js` loads the same data through the MongoDB API and enriches orders with `$lookup`, `$set`, `$unset`, and `$merge`.
-- `03-regex-filter.mongodb.js` demonstrates regex filtering.
-- `04-lookup-plants.mongodb.js` demonstrates lookup patterns across facility and plant documents.
-- `05-lookup-plants-sql.mongodb.js` shows the SQL-oriented equivalent.
-- `06-lookup-offers-sql.mongodb.js` creates `offerSummary` and `ifaOfferDaily100`, matches offer events by offer, widget, country, and date range, then returns rolled-up metrics in a `replacement` array.
-
-## Transactions
-
-Directory: `transactions/`
-
-These examples show how to run MongoDB-style transactions with the Oracle Database API for MongoDB, using a bank transfer scenario with an approval step before commit.
-
- `bank-transfer.mongodb.js` runs the transfer with MongoDB API reads and updates inside a transaction.
- `bank-transfer-sqljson.mongodb.js` runs the transfer with SQL/JSON reads and updates through `$sql` inside a MongoDB API transaction.
-
-## Change Streams
-
-Directory: `changeStreams/`
-
-These examples show how to enable `$changeStreams` in preview mode and consume insert, update, and delete events from the MongoDB API.
-
-- `watch-orders.mongodb.js` enables change streams on `xs_orders` and watches for changes.
-- `insert-orders.mongodb.js` inserts and updates a sample order so the watcher can receive events.
-
-## Change Streams Kafka
-
-Directory: `changeStreams-kafka/`
-
-These examples show how to capture Oracle API for MongoDB change stream events with Node.js and publish them to an Apache Kafka topic for downstream processing.
-
-- `mongo-kafka-cdc-cl/` contains the command-line CDC producer, including `cdc-mongodb-to-kafka.js`, which reads change events and publishes them to Kafka.
-- `mongo-kafka-cdc-ui/` contains the browser-based CDC application with connection status, runtime configuration, and a live event timeline for Oracle Database changes and Kafka publishes.
-
-## Text Search
-
-Directory: `search/`
-
-These examples show how to use MongoDB-style `$search` over JSON movie documents stored in Oracle using the MongoDB API.
-
-- `01-create-text-user.sql` creates the text search demo user and grants the required privileges.
-- `02-text-search-orclapi.mongodb.js` demonstrates text search patterns such as single-term search, multi-term search, `matchCriteria`, and fuzzy matching.
- Sample collection: [mflix_movies.json](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/E_Hz1fFFFfbbIGstyg3beN0_WP6QQwwzATe_BsPXhCiGUeaSoH0WjLU7tBZnzglZ/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/search/mflix_movies.json)
-
-## Vector Search
-
-Directory: `vectorsearch/`
-
-These examples show semantic search over JSON documents by using vector embeddings together with Oracle JSON collections and the MongoDB API.
-
-- `01-load_all_minilm_model_from_par.sql` loads the MiniLM embedding model.
-- `02-create-vector-embeddings.sql` creates embeddings for movie plot data.
-- `03-embed-prompt.sql` embeds a natural-language prompt.
-- `04-vector-search.mongodb.js` demonstrates vector search through the MongoDB API.
-- Vectorized collection: [mflix_movies_embeddings.json](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/yZJUDkTpVHdAI4vTUcuofDHWkk8w5sr2DoawtQ4PL9gQ-7hnHuNLH0gvOQNjJIRo/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/search/mflix_movies_embeddings.json)
- Embedding model: [ALL_MINILM_L12_V2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/hWtxHRNpBnQKaxtj5KtGVyQu4VYHqtuqAY4PUReK_6NxCeZRl94vm07lMGZAuOih/n/fro8fl9kuqli/b/bucket-for-ajd-data/o/vector-data/all_MiniLM_L12_v2.onnx)
-
-## References
-
-- [Oracle JSON Developer's Guide](https://docs.oracle.com/en/database/oracle/oracle-database/26/adjsn/)
-- [Oracle AI Vector Search Overview](https://docs.oracle.com/en/database/oracle/oracle-database/26/vecse/overview-ai-vector-search.html)
-- [Oracle Database API for MongoDB](https://docs.oracle.com/en/database/oracle/mongodb-api/mgapi/overview-oracle-database-api-mongodb.html)
-- [Oracle JSON: From relational to document store](https://github.com/JesusGitHubOracle/jlr-oracle-json)
-- [MongoDB Developer Documentation](https://www.mongodb.com/docs/development/)
-
-## License
-
-Copyright (c) 2026 Oracle and/or its affiliates.
-
-Released under the Universal Permissive License v1.0 as shown at [https://oss.oracle.com/licenses/upl/](https://oss.oracle.com/licenses/upl/).
-
-## Disclaimer
-
-ORACLE AND ITS AFFILIATES DO NOT PROVIDE ANY WARRANTY WHATSOEVER, EXPRESS OR IMPLIED, FOR ANY SOFTWARE, MATERIAL OR CONTENT OF ANY KIND CONTAINED OR PRODUCED WITHIN THIS REPOSITORY, AND IN PARTICULAR SPECIFICALLY DISCLAIM ANY AND ALL IMPLIED WARRANTIES OF TITLE, MERCHANTABILITY, AND FITNESS FOR A PARTICULAR PURPOSE. FURTHERMORE, ORACLE AND ITS AFFILIATES DO NOT REPRESENT THAT ANY CUSTOMARY SECURITY REVIEW HAS BEEN PERFORMED WITH RESPECT TO ANY SOFTWARE, MATERIAL OR CONTENT CONTAINED OR PRODUCED WITHIN THIS REPOSITORY. IN ADDITION, AND WITHOUT LIMITING THE FOREGOING, THIRD PARTIES MAY HAVE POSTED SOFTWARE, MATERIAL OR CONTENT TO THIS REPOSITORY WITHOUT ANY WARRANTY OF ANY KIND, INCLUDING THAT THE CONTENT IS FREE OF DEFECTS, MERCHANTABLE, FIT FOR A PARTICULAR PURPOSE OR NON-INFRINGING. ANY OPEN SOURCE SOFTWARE IS PROVIDED BY THE APPLICABLE LICENSOR "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+- Backup archives are compressed with `--gzip`.
+- Restore currently processes files ending in `.archive.gz`.
+- Database names are inferred from archive file names.
+- The scripts are intended for application databases, not MongoDB internal system databases.
+- Large migrations should be tested with representative data before a final migration window.
