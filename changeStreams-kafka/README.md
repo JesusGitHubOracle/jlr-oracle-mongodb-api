@@ -1,285 +1,312 @@
-# Kafka Connect Change Streams  
+# Oracle Database API for MongoDB Change Streams to Kafka
 
-How to stream Oracle Database API for MongoDB `$changeStreams` events into Kafka using Kafka Connect and the MongoDB Kafka Source Connector.
+This demo shows how to stream changes from Oracle Autonomous AI JSON Database into an Apache Kafka topic using Oracle Database API for MongoDB `$changeStreams`.
 
-## Architecture
+The default flow uses a small Node.js CDC producer that opens a MongoDB-compatible change stream and publishes each change event to Kafka.
 
 ```text
 Oracle Autonomous AI JSON
-  -> Oracle API for MongoDB $changeStream
-  -> Kafka Connect / MongoDB Source Connector
-  -> Apache Kafka Topic / mongo.orders.cdc
-  -> Kafka consumer
+       |
+       v
+Oracle API for MongoDB $changeStream
+       |
+       v
+Node.js CDC Producer
+       |
+       v
+Apache Kafka Topic
+       |
+       +-- Inventory
+       +-- Analytics
+       +-- Email
+       +-- Audit
 ```
 
-![Kafka Connect Change Streams Architecture](../docs/images/kafka-connect-architecture.svg)
+ 
 
-## Demo Files
+The repository also includes a Kafka Connect version of the same pattern under [`kafka-connect/`](kafka-connect/README.md). That version replaces the Node.js CDC producer with Kafka Connect and the MongoDB Kafka Source Connector.
 
-- `config/connect-standalone.properties` configures the local Kafka Connect standalone worker.
-- `config/mongodb-source-orders.properties` configures the MongoDB Kafka Source Connector for `shop.orders`.
-- `start-connect.sh` starts Kafka Connect with the worker and source connector configs.
-- `patch-connector.sh` downloads and patches the MongoDB Kafka Connector locally.
-- `.env.example` shows the expected `MONGODB_URI` format.
-- `PATCH-NOTES.md` documents the local connector patch used for Oracle Database API for MongoDB compatibility.
+## Pre-requisites
 
-## Prerequisites
+- Oracle Autonomous AI JSON Database with Oracle Database API for MongoDB enabled
+- `$changeStreams` enabled in preview mode
+- A user with the privileges required to create notification directives
+- Node.js 20 or newer
+- npm
+- Java 17 or newer
+- Apache Kafka
 
-- Java 17 or newer.
-- Kafka 4.3.1 available in `../kafka_2.13-4.3.1`.
-- Oracle Database API for MongoDB endpoint.
-- A database user that can use `$changeStreams`.
-- MongoDB shell or MongoDB for VS Code to generate test changes.
-
-For this demo, the MongoDB API database and collection are:
-
-```text
-database:   shop
-collection: orders
-topic:      mongo.orders.cdc
-```
-
-For Oracle Database API for MongoDB, grant the change stream privilege to the demo user:
+For the Oracle user used by this demo, grant the notification directive privilege:
 
 ```sql
-GRANT CREATE NOTIFICATION DIRECTIVE TO shop;
+grant create notification directive to json_aggregations;
 ```
 
-## Connector Patch
-
-This demo uses a patched local copy of the MongoDB Kafka Connector. Generate it locally with:
-
-```bash
-cd <Working directory>/changeStreams-kafka
-kafka-connect/patch-connector.sh
-```
-
-The script downloads the official connector JAR, applies the demo compatibility patch, and writes:
+## Demo Folders
 
 ```text
-kafka-connect/plugins/mongo-kafka-connect-3.0.1-all.jar
+changeStreams-kafka/
+  cdc-mongodb-kafka.js
+  insert-orders.mongodb.js
+  package.json
+  README.md
+  kafka-connect/
+    README.md
 ```
 
-The original connector JAR is preserved as:
+The parent directory demonstrates the direct `$changeStreams` to Kafka topic flow with Node.js.
+
+The `kafka-connect/` directory demonstrates the same CDC flow using Kafka Connect.
+
+## Default Configuration
+
+The Node.js producer uses environment variables for the Oracle API for MongoDB connection and Kafka settings.
 
 ```text
-kafka-connect/plugins/mongo-kafka-connect-3.0.1-all.jar.orig
+MONGODB_URI=<your Oracle API for MongoDB connection string>
+MONGO_DB=shop
+MONGO_COLLECTION=orders
+KAFKA_BROKERS=localhost:9092
+KAFKA_TOPIC=mongo.orders.cdc
 ```
 
-The patch makes two Oracle compatibility changes:
-
-- It skips the connector startup validation that calls MongoDB `rolesInfo`, because Oracle Database API for MongoDB does not support that command.
-- It treats a missing `operationTime` field in change stream command responses as an empty offset timestamp instead of throwing a `NullPointerException`.
-
-See `PATCH-NOTES.md` for details.
-
-## Step 1: Start Kafka
-
-Open terminal `T1` and go to the demo directory:
+Create a local `.env` file from the example if one is provided:
 
 ```bash
-cd <Working directory>/changeStreams-kafka
-cd kafka_2.13-4.3.1
+cd <working dir>/changeStreams-kafka
+cp .env.example .env
+npm install
 ```
 
-If this is the first time starting Kafka, or if `/tmp/kraft-combined-logs` was deleted, format Kafka storage:
+Then edit `.env` with your own Oracle API for MongoDB connection string.
+
+## Set Up Kafka
+
+Download Apache Kafka from:
+
+```text
+https://kafka.apache.org/downloads
+```
+
+Extract Kafka and move into the Kafka directory:
+
+```bash
+cd /path/to/kafka_2.13-4.3.1
+```
+
+On macOS, make sure Kafka uses Java 17:
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version
+```
+
+## Initialize Kafka Storage
+
+Kafka 4.x uses KRaft mode. Before starting Kafka for the first time, initialize the storage directory:
 
 ```bash
 KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
-
-bin/kafka-storage.sh format \
-  --standalone \
-  -t "$KAFKA_CLUSTER_ID" \
-  -c config/server.properties
+bin/kafka-storage.sh format --standalone -t "$KAFKA_CLUSTER_ID" -c config/server.properties
 ```
 
-Start Kafka if not already done:
+Run this format command only once for a new Kafka storage directory. If Kafka exits with `No readable meta.properties files found`, the storage directory has not been formatted yet.
 
-```bash
-cd <Working directory>/changeStreams-kafka
-bin/kafka-server-start.sh -daemon config/server.properties
-```
-
-Confirm Kafka started:
-
-```bash
-tail -f logs/server.log
-```
-
-Expected message:
-
-```text
-Kafka Server started
-```
-
-## Step 2: Create the Kafka Topic
+## Start Kafka
 
 From the Kafka directory:
 
 ```bash
-bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create \
-  --topic mongo.orders.cdc
+bin/kafka-server-start.sh -daemon config/server.properties
 ```
 
-If the topic already exists, that is fine.
+Confirm Kafka is listening:
+
+```bash
+lsof -i :9092
+```
+
+To stop Kafka:
+
+```bash
+bin/kafka-server-stop.sh
+```
+
+## Create the Kafka Topic
+
+Create the topic used by the demo:
+
+```bash
+bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic mongo.orders.cdc
+```
+
+If the topic already exists, continue with the demo.
 
 Verify the topic:
 
 ```bash
-bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --describe \
-  --topic mongo.orders.cdc
+bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic mongo.orders.cdc
 ```
 
-## Step 3: Start a Kafka Consumer
+## Change Streams in Action: Command Line
 
-Open terminal `T2`:
+Open three terminals: `T1`, `T2`, and `T3`.
+
+### T1 - Kafka Broker and Topic
+
+From the Kafka directory:
 
 ```bash
-cd < Working Directory>/changeStreams-kafka
-
-kafka_2.13-4.3.1/bin/kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 \
-  --topic mongo.orders.cdc \
-  --from-beginning
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+bin/kafka-server-start.sh -daemon config/server.properties
+bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic mongo.orders.cdc
 ```
 
-Leave this terminal running. It prints change stream events published by Kafka Connect.
+### T2 - Kafka Consumer
 
-## Step 4: Configure the Oracle MongoDB API URI
-
-Open terminal `T3`:
+From the Kafka directory:
 
 ```bash
-cd <Working Directory>/changeStreams-kafka
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic mongo.orders.cdc --from-beginning
 ```
 
-Set the Oracle Database API for MongoDB URI:
+Leave this terminal open. It prints the change events published to Kafka.
+
+### T3 - Node.js CDC Producer
+
+From the demo directory:
 
 ```bash
-export MONGODB_URI='mongodb://USER:PASSWORD@HOST:PORT/shop?authMechanism=PLAIN&authSource=$external&ssl=true&retryWrites=false&loadBalanced=true'
+cd <working dir>/changeStreams-kafka
+node cdc-mongodb-kafka.js
 ```
 
-The Kafka Connect source connector reads this value from the environment:
+The producer opens a `$changeStream` against the configured collection and publishes each change event to the Kafka topic.
 
-```properties
-connection.uri=${env:MONGODB_URI}
-```
-
-## Step 5: Start Kafka Connect
-
-From terminal `T3`:
-
-```bash
-cd <Working Directory>/changeStreams-kafka
-kafka-connect/start-connect.sh
-```
-
-Expected messages:
+The flow is:
 
 ```text
-Created connector mongodb-source-orders
-Watching for collection changes on 'shop.orders'
-New change stream cursor created without offset.
-Started MongoDB source task
-Source task finished initialization and start
-```
-
-Leave Kafka Connect running.
-
-## Step 6: Generate Test Changes
-
-Open terminal `T4`, MongoDB for VS Code, or `mongosh`, and connect to the same Oracle Database API for MongoDB endpoint.
-
-Insert and update an order:
-
-```javascript
-use("shop");
-
-db.orders.insertOne({
-  orderId: 2001,
-  customer: "Customer-2001",
-  total: 125,
-  status: "NEW",
-  createdAt: new Date()
-});
-
-db.orders.updateOne(
-  { orderId: 2001 },
-  { $set: { status: "PAID" } }
-);
-```
-
-## Step 7: Verify Kafka Output
-
-Return to terminal `T2`.
-
-You should see JSON change stream events in the `mongo.orders.cdc` topic. Insert events include the inserted document. Update events include metadata such as `documentKey` and `updateDescription`.
-
-The successful flow is:
-
-```text
-Insert/update in shop.orders
-  -> Oracle Database API for MongoDB $changeStreams
-  -> Kafka Connect MongoDB source connector
+Oracle Autonomous AI JSON orders collection
+  -> Oracle API for MongoDB $changeStream event
+  -> Node.js Kafka producer
   -> mongo.orders.cdc Kafka topic
-  -> Kafka console consumer
+  -> Kafka console consumer in T2
 ```
 
-## Configuration Summary
+## Generate Changes
 
-`config/mongodb-source-orders.properties` contains the important connector settings:
+Run the insert/update playground from another terminal or from the MongoDB for VS Code extension:
 
-```properties
-name=mongodb-source-orders
-connector.class=com.mongodb.kafka.connect.MongoSourceConnector
-connection.uri=${env:MONGODB_URI}
-database=shop
-collection=orders
-topic.namespace.map={"shop.orders":"mongo.orders.cdc"}
-publish.full.document.only=false
-change.stream.full.document=
-change.stream.full.document.before.change=whenAvailable
-pipeline=[{"$match":{"operationType":{"$in":["insert","update","replace","delete"]}}}]
-startup.mode=latest
+```bash
+cd <working dir>/changeStreams-kafka
+mongosh "$MONGODB_URI" insert-orders.mongodb.js
 ```
 
-`startup.mode=latest` means the connector starts with new changes only.
+You should see change events appear in the Node.js producer output and in the Kafka console consumer.
+
+## Change Streams in Action: GUI Option
+
+The `mongo-kafka-cdc-ui/` directory includes a small browser UI for the same demo flow. The UI lets you insert orders from a web page and watch both the Oracle API for MongoDB change stream events and Kafka publish events in real time.
+
+Before starting the GUI, make sure Kafka is running and the `mongo.orders.cdc` topic exists.
+
+From the GUI directory:
+
+```bash
+cd <working dir>/changeStreams-kafka/mongo-kafka-cdc-ui
+cp .env.example .env
+npm install
+```
+
+Edit `.env` with your Oracle API for MongoDB connection string:
+
+```text
+PORT=3000
+MONGODB_URI=<your Oracle API for MongoDB connection string>
+MONGO_DB=shop
+MONGO_COLLECTION=orders
+KAFKA_BROKERS=localhost:9092
+KAFKA_TOPIC=mongo.orders.cdc
+ENABLE_PRE_POST_IMAGES=true
+```
+
+Start the GUI:
+
+```bash
+npm start
+```
+
+Open the browser at:
+
+```text
+http://localhost:3000
+```
+
+Click **Insert Order** to create a new order document. The page shows:
+
+- Oracle API for MongoDB connection status
+- Kafka producer status
+- Change stream status
+- Live change stream events
+- Kafka publish confirmations
+
+You can also keep the Kafka console consumer open while using the GUI:
+
+```bash
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic mongo.orders.cdc --from-beginning
+```
+
+When you click **Insert Order**, the event should appear in both the browser UI and the Kafka console consumer.
+
+## Kafka Connect Option
+
+Kafka Connect is useful when you want Kafka to manage the CDC connector lifecycle instead of maintaining a custom producer process.
+
+Use the Kafka Connect version when you want:
+
+- A connector-managed source process
+- Standard Kafka Connect configuration files
+- Operational consistency with other Kafka ingestion pipelines
+- A reusable runbook for customer demos
+
+Start with [`kafka-connect/README.md`](kafka-connect/README.md).
 
 ## Troubleshooting
 
-If Kafka fails with `No readable meta.properties files found`, format Kafka storage:
+### Kafka exits with `No readable meta.properties files found`
+
+Kafka storage was not initialized. Run:
 
 ```bash
-KAFKA_CLUSTER_ID="$(kafka_2.13-4.3.1/bin/kafka-storage.sh random-uuid)"
-
-kafka_2.13-4.3.1/bin/kafka-storage.sh format \
-  --standalone \
-  -t "$KAFKA_CLUSTER_ID" \
-  -c kafka_2.13-4.3.1/config/server.properties
+KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
+bin/kafka-storage.sh format --standalone -t "$KAFKA_CLUSTER_ID" -c config/server.properties
 ```
 
-If Kafka Connect reports `Unknown command rolesInfo`, confirm it is using the patched connector JAR from:
+Then start Kafka again.
 
-```text
-kafka-connect/plugins/mongo-kafka-connect-3.0.1-all.jar
+### Oracle API for MongoDB user gets insufficient privileges
+
+Grant the notification directive privilege to the schema/user used by the demo:
+
+```sql
+grant create notification directive to json_aggregations;
 ```
 
-If Kafka Connect logs repeated `NullPointerException` messages from `ResumeTokenUtils.getResponseOffsetSecs`, confirm it is using the patched connector JAR.
+### Kafka consumer shows no messages
 
-If no events appear in Kafka:
+Check:
 
-- Confirm Kafka is running on `localhost:9092`.
-- Confirm the `mongo.orders.cdc` topic exists.
-- Confirm `MONGODB_URI` points to the Oracle Database API for MongoDB endpoint.
-- Confirm the connector logs show `Started MongoDB source task`.
-- Insert or update documents after Kafka Connect has started, because `startup.mode=latest` listens for new changes.
+- Kafka is running on `localhost:9092`
+- The topic name matches `KAFKA_TOPIC`
+- The Node.js producer is running
+- The insert/update script is writing to the same database and collection watched by the producer
+- `$changeStreams` is enabled for the Oracle API for MongoDB environment
 
 ## References
 
-- [MongoDB Kafka Source Connector](https://www.mongodb.com/docs/kafka-connector/current/source-connector/)
-- [MongoDB Kafka Source Connector Configuration Properties](https://www.mongodb.com/docs/kafka-connector/current/source-connector/configuration-properties/)
-- [Oracle API for MongoDB - Feature Support](https://docs.oracle.com/en/database/oracle/mongodb-api/mgapi/support-mongodb-apis-operations-and-data-types-reference.html)
+- [Oracle API for MongoDB - Feature Support (Change Streams)](https://docs.oracle.com/en/database/oracle/mongodb-api/mgapi/support-mongodb-apis-operations-and-data-types-reference.html#GUID-48B388E6-356B-4A6F-AE51-42BE9C635378)
+- [MongoDB Change Streams](https://www.mongodb.com/docs/manual/changeStreams/)
+- [Apache Kafka Quickstart](https://kafka.apache.org/quickstart)
+- [Kafka Connect](https://kafka.apache.org/documentation/#connect)
