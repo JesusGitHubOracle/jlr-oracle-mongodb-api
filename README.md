@@ -29,6 +29,18 @@ The connected user needs permission to list databases and run `dbStats` on each
 reported database. Add `--include-system-databases` only when those databases
 also need to be included.
 
+### MongoDB Collection Space Report
+
+Use `atlas_collection_space.sh` to interactively select a database and collection
+and report logical document data plus allocated collection and index storage. For
+sharded collections, the script sums the shard results and prints a per-shard
+breakdown.
+
+```bash
+export MONGO_URI='mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority'
+./migration/atlas_collection_space.sh
+```
+
 ### Backup databases
 
 `backup-app-dbs.sh` backs up MongoDB databases with `mongodump`. Use `APP_DATABASES` to back up a specific list, or set `BACKUP_MODE=all` to back up all databases except `admin`, `local`, and `config`.
