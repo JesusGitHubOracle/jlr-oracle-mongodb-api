@@ -6,8 +6,7 @@
 set -euo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-:q!
-="${MONGO_URI:-}"
+URI=$"{MONGO_URI:-}"
 DATABASE_NAME=""
 COLLECTION_NAME=""
 
