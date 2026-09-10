@@ -76,8 +76,15 @@ export SKIP_INDEXES=1
 # Write logs somewhere other than ./restore-logs.
 export LOG_DIR=./restore-logs
 
+# Tune restore parallelism. Start with values appropriate for the target capacity.
+# PARALLEL_COLLECTIONS restores independent collections concurrently.
+# INSERTION_WORKERS_PER_COLLECTION writes documents concurrently within a collection.
+PARALLEL_COLLECTIONS=8 \
+INSERTION_WORKERS_PER_COLLECTION=8 \
 ./restore-db-archives.sh ./backups/20260706_120000
 ```
+
+`PARALLEL_COLLECTIONS` helps only when an archive contains multiple collections. For one-collection archives, such as the archives produced by this script's backup workflow, `INSERTION_WORKERS_PER_COLLECTION` is the setting that can increase restore throughput.
 
 The restore script only processes files ending in `.archive.gz`. For example, a backup directory like this:
 
