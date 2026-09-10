@@ -79,8 +79,9 @@ export LOG_DIR=./restore-logs
 # Tune restore parallelism. Start with values appropriate for the target capacity.
 # PARALLEL_COLLECTIONS restores independent collections concurrently.
 # INSERTION_WORKERS_PER_COLLECTION writes documents concurrently within a collection.
-PARALLEL_COLLECTIONS=8 \
-INSERTION_WORKERS_PER_COLLECTION=8 \
+export PARALLEL_COLLECTIONS=8
+export INSERTION_WORKERS_PER_COLLECTION=8
+
 ./restore-db-archives.sh ./backups/20260706_120000
 ```
 
