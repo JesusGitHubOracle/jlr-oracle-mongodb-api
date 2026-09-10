@@ -87,7 +87,7 @@ export INSERTION_WORKERS_PER_COLLECTION=8
 
 `PARALLEL_COLLECTIONS` helps only when an archive contains multiple collections. For one-collection archives, such as the archives produced by this script's backup workflow, `INSERTION_WORKERS_PER_COLLECTION` is the setting that can increase restore throughput.
 
-The restore script only processes files ending in `.archive.gz`. For example, a backup directory like this:
+The restore script processes files ending in `.archive.gz`. For example, a backup directory like this:
 
 ```text
 backups/20260706_120000/
@@ -96,12 +96,6 @@ backups/20260706_120000/
 ```
 
 restores the databases `json_aggregations` and `json_orders`.
-
-If Oracle reports that a collection already exists even when using `DROP_EXISTING=1`, remove the conflicting Oracle-side object and rerun the restore. Quoted identifiers are needed when the Oracle object name preserves lowercase or mixed-case spelling:
-
-```sql
-drop table "JSON_ORDERS"."purchaseorders" cascade constraints;
-```
 
 ### Extract indexes
 
